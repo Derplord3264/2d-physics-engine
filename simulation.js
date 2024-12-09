@@ -68,10 +68,22 @@ class Particle {
             const ax = (targetX - other.x) * 0.05; // Apply some force towards the target
             const ay = (targetY - other.y) * 0.05;
 
-            this.vx -= ax;
-            this.vy -= ay;
-            other.vx += ax;
-            other.vy += ay;
+            // Apply friction on collision
+            const friction = 0.1; // Friction coefficient
+            const relativeVelocityX = other.vx - this.vx;
+            const relativeVelocityY = other.vy - this.vy;
+
+            // Apply friction force based on relative velocity
+            other.vx -= relativeVelocityX * friction;
+            other.vy -= relativeVelocityY * friction;
+            this.vx += relativeVelocityX * friction;
+            this.vy += relativeVelocityY * friction;
+
+            // Adjust positions to avoid sticking
+            this.x -= ax;
+            this.y -= ay;
+            other.x += ax;
+            other.y += ay;
         }
     }
 
@@ -135,21 +147,15 @@ function init() {
     particles.push(particle);
 }
 
-// Apply gravity and friction to particles
+// Apply gravity to particles
 function applyForces() {
     const gravity = { x: 0, y: 0.1 }; // Simple constant gravity
     for (const particle of particles) {
         // Apply gravity
         particle.applyForce(gravity);
+        
         // Apply air resistance
         particle.applyAirResistance();
-        // Apply friction
-        if (particle.y + particle.radius >= canvas.height) { // Ground check
-            const friction = -0.1 * particle.vx; // Friction proportional to velocity
-            particle.applyForce({ x: friction, y: 0 });
-            particle.y = canvas.height - particle.radius; // Keep on ground
-            particle.vy = 0; // Stop vertical movement
-        }
     }
 }
 
