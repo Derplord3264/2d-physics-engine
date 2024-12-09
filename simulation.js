@@ -39,6 +39,9 @@ class Particle {
         this.x += this.vx;
         this.y += this.vy;
 
+        // Apply screen boundaries
+        this.checkBorders();
+
         // Reset forces for the next frame
         this.forces = [];
     }
@@ -88,6 +91,37 @@ class Particle {
     stopDragging() {
         this.isDragging = false;
     }
+
+    // Check and apply screen boundaries
+    checkBorders() {
+        // Left and right boundaries
+        if (this.x - this.radius < 0) {
+            this.x = this.radius; // Reset to the left edge
+            this.vx = 0; // Stop horizontal movement
+        } else if (this.x + this.radius > canvas.width) {
+            this.x = canvas.width - this.radius; // Reset to the right edge
+            this.vx = 0; // Stop horizontal movement
+        }
+
+        // Top and bottom boundaries
+        if (this.y - this.radius < 0) {
+            this.y = this.radius; // Reset to the top edge
+            this.vy = 0; // Stop vertical movement
+        } else if (this.y + this.radius > canvas.height) {
+            this.y = canvas.height - this.radius; // Reset to the bottom edge
+            this.vy = 0; // Stop vertical movement
+        }
+    }
+
+    // Apply air resistance
+    applyAirResistance() {
+        const dragCoefficient = 0.05; // Adjust this value for more or less drag
+        const dragForce = {
+            x: -this.vx * dragCoefficient,
+            y: -this.vy * dragCoefficient
+        };
+        this.applyForce(dragForce);
+    }
 }
 
 const particles = [];
@@ -107,6 +141,8 @@ function applyForces() {
     for (const particle of particles) {
         // Apply gravity
         particle.applyForce(gravity);
+        // Apply air resistance
+        particle.applyAirResistance();
         // Apply friction
         if (particle.y + particle.radius >= canvas.height) { // Ground check
             const friction = -0.1 * particle.vx; // Friction proportional to velocity
@@ -158,6 +194,8 @@ canvas.addEventListener('mousemove', (e) => {
         if (particle.isDragging) {
             particle.x = mx;
             particle.y = my;
+            particle.vx = 0; // Reset velocity while dragging
+            particle.vy = 0;
         }
     }
     if (isDrawing) {
@@ -181,4 +219,5 @@ canvas.addEventListener('mouseup', () => {
 
 // Start the simulation
 init();
+applyForces(); // Apply forces in the update loop
 update();
