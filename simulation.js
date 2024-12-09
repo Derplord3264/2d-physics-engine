@@ -12,6 +12,7 @@ class Particle {
         this.vx = 0; // Velocity in x
         this.vy = 0; // Velocity in y
         this.forces = []; // Array to hold forces acting on the particle
+        this.isDragging = false; // Flag for dragging
     }
 
     applyForce(force) {
@@ -24,7 +25,7 @@ class Particle {
             acc.x += force.x;
             acc.y += force.y;
             return acc;
-        }, {x: 0, y: 0});
+        }, { x: 0, y: 0 });
 
         // Use F = m * a to get acceleration
         const ax = netForce.x / this.mass;
@@ -45,9 +46,47 @@ class Particle {
     draw() {
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = 'blue';
+        ctx.fillStyle = this.isDragging ? 'red' : 'blue'; // Change color when dragging
         ctx.fill();
         ctx.closePath();
+    }
+
+    // Check for collision with another particle
+    checkCollision(other) {
+        const dx = other.x - this.x;
+        const dy = other.y - this.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < this.radius + other.radius) {
+            // Simple elastic collision response
+            const angle = Math.atan2(dy, dx);
+            const targetX = this.x + Math.cos(angle) * (this.radius + other.radius);
+            const targetY = this.y + Math.sin(angle) * (this.radius + other.radius);
+            const ax = (targetX - other.x) * 0.05; // Apply some force towards the target
+            const ay = (targetY - other.y) * 0.05;
+
+            this.vx -= ax;
+            this.vy -= ay;
+            other.vx += ax;
+            other.vy += ay;
+        }
+    }
+
+    // Check if the mouse is over the particle
+    isMouseOver(mx, my) {
+        const dx = mx - this.x;
+        const dy = my - this.y;
+        return Math.sqrt(dx * dx + dy * dy) < this.radius;
+    }
+
+    // Start dragging
+    startDragging() {
+        this.isDragging = true;
+    }
+
+    // Stop dragging
+    stopDragging() {
+        this.isDragging = false;
     }
 }
 
@@ -62,13 +101,19 @@ function init() {
     particles.push(particle);
 }
 
-// Apply friction to particles when they touch the ground
-function applyFriction(particle) {
-    if (particle.y + particle.radius >= canvas.height) { // Simple ground check
-        const friction = -0.1 * particle.vx; // Friction proportional to velocity
-        particle.applyForce({ x: friction, y: 0 });
-        particle.y = canvas.height - particle.radius; // Ensure the particle stays on the ground
-        particle.vy = 0; // Stop vertical movement
+// Apply gravity and friction to particles
+function applyForces() {
+    const gravity = { x: 0, y: 0.1 }; // Simple constant gravity
+    for (const particle of particles) {
+        // Apply gravity
+        particle.applyForce(gravity);
+        // Apply friction
+        if (particle.y + particle.radius >= canvas.height) { // Ground check
+            const friction = -0.1 * particle.vx; // Friction proportional to velocity
+            particle.applyForce({ x: friction, y: 0 });
+            particle.y = canvas.height - particle.radius; // Keep on ground
+            particle.vy = 0; // Stop vertical movement
+        }
     }
 }
 
@@ -76,11 +121,15 @@ function applyFriction(particle) {
 function update() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Gravity force
-    const gravity = { x: 0, y: 0.1 }; // Simple constant gravity
+    // Check for collisions
+    for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+            particles[i].checkCollision(particles[j]);
+        }
+    }
+
+    // Update and draw particles
     for (const particle of particles) {
-        applyFriction(particle); // Apply friction
-        particle.applyForce(gravity);
         particle.update();
         particle.draw();
     }
@@ -90,17 +139,37 @@ function update() {
 
 // Mouse event listeners for drawing shapes
 canvas.addEventListener('mousedown', (e) => {
-    isDrawing = true;
-    currentShape.push({ x: e.clientX, y: e.clientY });
+    const mx = e.clientX;
+    const my = e.clientY;
+    const particle = particles.find(p => p.isMouseOver(mx, my));
+    if (particle) {
+        particle.startDragging();
+    } else {
+        isDrawing = true;
+        currentShape.push({ x: mx, y: my });
+    }
 });
 
 canvas.addEventListener('mousemove', (e) => {
+    const mx = e.clientX;
+    const my = e.clientY;
+    // Dragging functionality
+    for (const particle of particles) {
+        if (particle.isDragging) {
+            particle.x = mx;
+            particle.y = my;
+        }
+    }
     if (isDrawing) {
-        currentShape.push({ x: e.clientX, y: e.clientY });
+        currentShape.push({ x: mx, y: my });
     }
 });
 
 canvas.addEventListener('mouseup', () => {
+    // Stop dragging for all particles
+    for (const particle of particles) {
+        particle.stopDragging();
+    }
     isDrawing = false;
     // Create a particle for the last point of the shape
     if (currentShape.length > 0) {
